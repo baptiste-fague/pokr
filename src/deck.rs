@@ -4,11 +4,13 @@ pub struct Deck {
 
 impl Deck {}
 
+#[derive(Clone, Copy)]
 pub struct Card {
     suit: Suit,
     value: Value,
 }
 
+#[derive(Clone, Copy)]
 pub enum Suit {
     Spades,
     Diamonds,
@@ -16,6 +18,7 @@ pub enum Suit {
     Hearts,
 }
 
+#[derive(Clone, Copy)]
 pub struct Value {
     n: u32,
 }
