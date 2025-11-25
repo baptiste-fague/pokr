@@ -1,4 +1,5 @@
-use crate::{deck::Card, *};
+use crate::card::*;
+use crate::*;
 
 use thiserror::Error;
 
@@ -42,7 +43,7 @@ impl Round {
 pub struct GameState {
     current_seat: usize,
 
-    board: [Option<Card>; 5],
+    board: Board,
 
     seats: Vec<Seat>,
     sb_seat: usize,
@@ -115,7 +116,7 @@ impl Game {
         Game {
             game_state: GameState {
                 current_seat: 0,
-                board: [None; 5],
+                board: Board::new(),
                 seats: vec![Seat::new(settings.initial_stack); settings.n_players],
                 sb_seat: 0,
                 pot: 0,
@@ -141,7 +142,7 @@ impl Game {
     }
 
     fn update_round(&mut self) -> Result<(), GameError> {
-        let card_count = self.game_state.board.iter().filter(|i| i.is_some()).count();
+        let card_count = self.game_state.board.card_count();
         self.game_state.round = Round::from_card_count(card_count)?;
         Ok(())
     }
