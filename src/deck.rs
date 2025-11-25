@@ -1,3 +1,5 @@
+use rand::RngCore;
+
 pub struct Deck {
     deck: Vec<Card>,
 }
@@ -9,7 +11,9 @@ impl Deck {
 
     fn shuffle(&mut self, rng: &mut impl RngCore) {}
 
-    fn new() -> Self {}
+    fn new() -> Self {
+        todo!()
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -45,18 +49,38 @@ impl Ord for PokerHand {
     }
 }
 
+impl PartialOrd for PokerHand {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        todo!()
+    }
+}
+
+impl PartialEq for PokerHand {
+    fn eq(&self, other: &Self) -> bool {
+        todo!()
+    }
+}
+
+impl Eq for PokerHand {}
+
 pub struct Board {
     cards: [Option<Card>; 5],
 }
 
 impl Board {
-    fn new() {
+    fn new() -> Self {
         Board { cards: [None; 5] }
     }
 
-    fn best_poker_hand(&self, player_hand: &PlayerHand) -> PokerHand {}
+    fn best_poker_hand(&self, player_hand: &PlayerHand) -> PokerHand {
+        todo!()
+    }
 
-    fn add_card(&mut self, card: Card) {}
+    fn add_card(&mut self, card: Card) {
+        todo!()
+    }
 
-    fn card_count(&self) -> usize {}
+    fn card_count(&self) -> usize {
+        todo!()
+    }
 }
