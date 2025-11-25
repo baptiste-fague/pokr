@@ -1,18 +1,42 @@
-use rand::RngCore;
+use rand::{RngCore, seq::SliceRandom};
 
 pub struct Deck {
     deck: Vec<Card>,
 }
 
 impl Deck {
-    fn draw_card(&mut self) -> Card {
-        todo!()
+    pub fn draw_card(&mut self) -> Card {
+        self.deck.pop().unwrap()
     }
 
-    fn shuffle(&mut self, rng: &mut impl RngCore) {}
+    pub fn shuffle(&mut self, rng: &mut impl RngCore) {
+        self.deck.shuffle(rng)
+    }
 
-    fn new() -> Self {
-        todo!()
+    pub fn new() -> Self {
+        let mut deck = Vec::new();
+
+        for suit in [Suit::Spades, Suit::Hearts, Suit::Diamonds, Suit::Clubs] {
+            for value in [
+                Value::Ace,
+                Value::King,
+                Value::Queen,
+                Value::Jack,
+                Value::Ten,
+                Value::Nine,
+                Value::Eight,
+                Value::Seven,
+                Value::Six,
+                Value::Five,
+                Value::Four,
+                Value::Three,
+                Value::Two,
+            ] {
+                deck.push(Card { suit, value });
+            }
+        }
+
+        Self { deck: deck }
     }
 }
 
@@ -21,6 +45,56 @@ pub struct Card {
     suit: Suit,
     value: Value,
 }
+
+pub enum Value {
+    Ace,
+    King,
+    Queen,
+    Jack,
+    Ten,
+    Nine,
+    Eight,
+    Seven,
+    Six,
+    Five,
+    Four,
+    Three,
+    Two,
+}
+
+impl Value {
+    fn number_value(&self) -> usize {
+        match self {
+            Value::Ace => 14,
+            Value::King => 13,
+            Value::Queen => 12,
+            Value::Jack => 11,
+            Value::Ten => 10,
+            Value::Nine => 9,
+            Value::Eight => 8,
+            Value::Seven => 7,
+            Value::Six => 6,
+            Value::Five => 5,
+            Value::Four => 4,
+            Value::Three => 3,
+            Value::Two => 2,
+        }
+    }
+}
+
+impl PartialEq for Card {
+    fn eq(&self, other: &Self) -> bool {
+        self.suit == other.suit && self.value == other.value
+    }
+}
+
+impl PartialOrd for Card {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        number_value(self.value).partial_cmp(number_value(other.value))
+    }
+}
+
+impl Eq for Card {}
 
 #[derive(Clone, Copy)]
 pub enum Suit {
