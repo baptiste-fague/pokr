@@ -7,10 +7,12 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CardError {
-    #[error("Invalid board card count")]
-    InvalidBoardCardCount,
+    #[error("Tried to add a card to a full board")]
+    BoardOverflow,
     #[error("Invalid poker hand card count")]
     InvalidPokerHandCardCount,
+    #[error("Tried to draw from an empty deck")]
+    EmptyDeck,
 }
 
 pub struct Deck {
@@ -18,8 +20,8 @@ pub struct Deck {
 }
 
 impl Deck {
-    pub fn draw_card(&mut self) -> Card {
-        self.deck.pop().unwrap()
+    pub fn draw_card(&mut self) -> Result<Card, CardError> {
+        self.deck.pop().ok_or(CardError::EmptyDeck)
     }
 
     pub fn shuffle(&mut self, rng: &mut impl RngCore) {
@@ -59,6 +61,7 @@ pub struct Card {
     value: Value,
 }
 
+#[derive(Clone, Copy, PartialEq)]
 pub enum Value {
     Ace,
     King,
@@ -103,23 +106,20 @@ impl PartialEq for Card {
 
 impl PartialOrd for Card {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        number_value(self.value).partial_cmp(number_value(other.value))
+        self.value
+            .number_value()
+            .partial_cmp(&other.value.number_value())
     }
 }
 
 impl Eq for Card {}
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Suit {
     Spades,
     Diamonds,
     Clubs,
     Hearts,
-}
-
-#[derive(Clone, Copy)]
-pub struct Value {
-    n: u32,
 }
 
 pub struct PlayerHand {
@@ -201,7 +201,7 @@ impl Board {
 
     fn add_card(&mut self, card: Card) -> Result<(), CardError> {
         if self.card_count >= 5 {
-            return Err(CardError::InvalidBoardCardCount);
+            return Err(CardError::BoardOverflow);
         }
         self.cards[self.card_count] = Some(card);
         self.card_count += 1;
