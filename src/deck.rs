@@ -146,6 +146,21 @@ impl PokerHand {
                 .ok_or(CardError::InvalidPokerHandCardCount)?,
         })
     }
+
+    fn contains_hand(&self, hand_type: HandType) -> bool {
+        match hand_type {
+            HandType::RoyalFlush => todo!(),
+            HandType::StraightFlush => todo!(),
+            HandType::FourOfAKind => todo!(),
+            HandType::FullHouse => todo!(),
+            HandType::Flush => todo!(),
+            HandType::Straight => todo!(),
+            HandType::ThreeOfAKind => todo!(),
+            HandType::DoublePair => todo!(),
+            HandType::Pair => todo!(),
+            HandType::HighCard => todo!(),
+        }
+    }
 }
 
 impl Ord for PokerHand {
@@ -158,6 +173,19 @@ impl PartialOrd for PokerHand {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         todo!()
     }
+}
+
+pub enum HandType {
+    RoyalFlush,
+    StraightFlush,
+    FourOfAKind,
+    FullHouse,
+    Flush,
+    Straight,
+    ThreeOfAKind,
+    DoublePair,
+    Pair,
+    HighCard,
 }
 
 impl PartialEq for PokerHand {
