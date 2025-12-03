@@ -1,10 +1,16 @@
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Card {
     pub suit: Suit,
     pub value: Value,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+impl Card {
+    pub fn new(suit: Suit, value: Value) -> Self {
+        Card { suit, value }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Value {
     Ace,
     King,
@@ -22,7 +28,7 @@ pub enum Value {
 }
 
 impl Value {
-    fn number_value(&self) -> usize {
+    pub fn number_value(&self) -> usize {
         match self {
             Value::Ace => 14,
             Value::King => 13,
@@ -57,7 +63,7 @@ impl PartialOrd for Card {
 
 impl Eq for Card {}
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Suit {
     Spades,
     Diamonds,
