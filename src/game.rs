@@ -105,7 +105,7 @@ impl Seat {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Settings {
     pub n_players: usize,
     pub initial_stack: usize,
