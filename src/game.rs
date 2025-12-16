@@ -38,17 +38,25 @@ impl Round {
             _ => Err(GameError::InvalidRoundCardCount),
         }
     }
+
+    fn next_round_name(&self) -> Self {
+        match self {
+            Round::PreFlop => Round::Flop,
+            Round::Flop => Round::Turn,
+            Round::Turn => Round::River,
+            Round::River => panic!("Unexpected next_round call during River"),
+        }
+    }
 }
 
 pub struct GameState {
     current_seat: usize,
 
+    deck: Deck,
     board: Board,
 
     seats: Vec<Seat>,
     sb_seat: usize,
-
-    pot: usize,
 
     round: Round,
 }
@@ -65,13 +73,24 @@ impl GameState {
         next_seat
     }
 
+    fn previous_valid_seat(&self, seat: usize) -> usize {
+        let mut previous_seat = seat;
+        loop {
+            previous_seat = (previous_seat - 1) % self.seats.len();
+            if self.is_seat_valid(previous_seat) {
+                break;
+            }
+        }
+        previous_seat
+    }
+
     fn is_seat_valid(&self, seat: usize) -> bool {
         self.seats[seat].is_valid()
     }
 }
 
 pub struct GameData {
-    hand_cound: usize,
+    hand_count: usize,
 }
 
 pub struct Game {
@@ -82,8 +101,10 @@ pub struct Game {
 
 #[derive(Clone, Copy)]
 pub struct Seat {
+    pub hand: Option<PlayerHand>,
     pub stack: usize,
     pub bet: usize,
+    pub total_bets: usize,
     pub is_folded: bool,
     pub is_dead: bool,
     pub last_action_in_current_round: Option<Action>,
@@ -92,8 +113,10 @@ pub struct Seat {
 impl Seat {
     fn new(stack: usize) -> Self {
         Seat {
+            hand: None,
             stack,
             bet: 0,
+            total_bets: 0,
             is_folded: false,
             is_dead: false,
             last_action_in_current_round: None,
@@ -116,14 +139,14 @@ impl Game {
         Game {
             game_state: GameState {
                 current_seat: 0,
+                deck: Deck::new(),
                 board: Board::new(),
                 seats: vec![Seat::new(settings.initial_stack); settings.n_players],
                 sb_seat: 0,
-                pot: 0,
                 round: Round::PreFlop,
             },
             settings,
-            game_data: GameData { hand_cound: 0 },
+            game_data: GameData { hand_count: 0 },
         }
     }
 
@@ -181,7 +204,10 @@ impl Game {
     }
 
     fn next_round(game_state: &mut GameState) {
-        todo!()
+        game_state.round = game_state.round.next_round_name();
+        let new_card = game_state.deck.draw_card();
+        game_state.board.add_card(new_card.unwrap());
+        game_state.current_seat = game_state.next_valid_seat(game_state.sb_seat);
     }
 
     fn next_hand(game_state: &mut GameState) {
@@ -189,6 +215,7 @@ impl Game {
         //   - check for winner(s)
         //   - update winner(s) stack(s)
         //   - set dead flags
+        todo!();
 
         // next_hand:
         //   - update round
@@ -198,7 +225,12 @@ impl Game {
         //   - change current player
         game_state.current_seat = game_state.sb_seat;
         //   - deal new hand
-        todo!()
+        game_state.deck = Deck::new();
+        game_state.deck.shuffle(&mut rand::rng());
+        game_state
+            .seats
+            .iter_mut()
+            .for_each(|seat| seat.hand = Some(game_state.deck.draw_hand().unwrap()));
     }
 
     fn is_hand_over(&self) -> bool {
@@ -217,19 +249,41 @@ impl Game {
         }
 
         self.next_turn();
-
-        todo!()
     }
 
     fn handle_action(&mut self, action: Action) {
-        // todo: check action validity
+        let mut current_seat = self.game_state.seats[self.game_state.current_seat];
         match action {
-            Action::Fold => self.game_state.seats[self.game_state.current_seat].is_folded = true,
+            Action::Fold => current_seat.is_folded = true,
             Action::Raise(amount) => {
-                self.game_state.seats[self.game_state.current_seat].bet += amount
+                if amount > 0 && current_seat.stack >= amount {
+                    current_seat.bet += amount;
+                    current_seat.stack -= amount
+                } else {
+                    panic!()
+                }
             }
-            Action::Call => todo!(),
-            Action::Check => {}
+            Action::Call => {
+                let previous_seat = self.game_state.seats[self
+                    .game_state
+                    .previous_valid_seat(self.game_state.current_seat)];
+                let amount = previous_seat.bet - current_seat.bet;
+                if amount > 0 && current_seat.stack >= amount {
+                    self.game_state.seats[self.game_state.current_seat].bet += amount;
+                    self.game_state.seats[self.game_state.current_seat].stack -= amount
+                } else {
+                    panic!()
+                }
+            }
+            Action::Check => {
+                let previous_seat = self.game_state.seats[self
+                    .game_state
+                    .previous_valid_seat(self.game_state.current_seat)];
+                let amount = previous_seat.bet - current_seat.bet;
+                if amount != 0 {
+                    panic!()
+                }
+            }
         }
     }
 
@@ -242,7 +296,12 @@ impl Game {
     }
 
     pub fn over(&self) -> bool {
-        false
+        self.game_state
+            .seats
+            .iter()
+            .filter(|seat| !seat.is_dead)
+            .count()
+            == 1
     }
 }
 

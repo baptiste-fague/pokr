@@ -10,6 +10,14 @@ impl Deck {
         self.deck.pop().ok_or(CardError::EmptyDeck)
     }
 
+    pub fn draw_hand(&mut self) -> Result<PlayerHand, CardError> {
+        let card1 = self.draw_card()?;
+        let card2 = self.draw_card()?;
+        Ok(PlayerHand {
+            cards: [card1, card2],
+        })
+    }
+
     pub fn shuffle(&mut self, rng: &mut impl RngCore) {
         self.deck.shuffle(rng)
     }
