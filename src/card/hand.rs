@@ -1,8 +1,9 @@
 use crate::card::*;
 use itertools::Itertools;
 
+#[derive(Clone, Copy)]
 pub struct PlayerHand {
-    cards: [Card; 2],
+    pub cards: [Card; 2],
 }
 
 impl PlayerHand {
