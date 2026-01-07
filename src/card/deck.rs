@@ -43,6 +43,7 @@ impl Deck {
             ] {
                 deck.push(Card { suit, value });
             }
+            deck.shuffle(&mut rand::rng())
         }
 
         Self { deck: deck }

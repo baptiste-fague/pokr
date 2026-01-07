@@ -9,6 +9,10 @@ pub enum GameError {
     InvalidAction,
     #[error("Invalid round card count")]
     InvalidRoundCardCount,
+    #[error("Invalid raise amount")]
+    InvalidRaise,
+    #[error("Unexpected next_round call during River")]
+    InvalidRoundCall,
 }
 
 #[derive(PartialEq, Eq)]
@@ -39,18 +43,20 @@ impl Round {
         }
     }
 
-    fn next_round_name(&self) -> Self {
+    fn next_round_name(&self) -> Result<Self, GameError> {
         match self {
-            Round::PreFlop => Round::Flop,
-            Round::Flop => Round::Turn,
-            Round::Turn => Round::River,
-            Round::River => panic!("Unexpected next_round call during River"),
+            Round::PreFlop => Ok(Round::Flop),
+            Round::Flop => Ok(Round::Turn),
+            Round::Turn => Ok(Round::River),
+            Round::River => Err(GameError::InvalidRoundCall),
         }
     }
 }
 
 pub struct GameState {
     current_seat: usize,
+    current_bet: usize,
+    current_raise: usize,
 
     deck: Deck,
     board: Board,
@@ -71,17 +77,6 @@ impl GameState {
             }
         }
         next_seat
-    }
-
-    fn previous_valid_seat(&self, seat: usize) -> usize {
-        let mut previous_seat = seat;
-        loop {
-            previous_seat = (previous_seat - 1) % self.seats.len();
-            if self.is_seat_valid(previous_seat) {
-                break;
-            }
-        }
-        previous_seat
     }
 
     fn is_seat_valid(&self, seat: usize) -> bool {
@@ -132,6 +127,8 @@ impl Seat {
 pub struct Settings {
     pub n_players: usize,
     pub initial_stack: usize,
+    pub small_blind: usize,
+    pub big_blind: usize,
 }
 
 impl Game {
@@ -139,6 +136,8 @@ impl Game {
         Game {
             game_state: GameState {
                 current_seat: 0,
+                current_bet: settings.big_blind,
+                current_raise: 0,
                 deck: Deck::new(),
                 board: Board::new(),
                 seats: vec![Seat::new(settings.initial_stack); settings.n_players],
@@ -151,7 +150,7 @@ impl Game {
     }
 
     pub fn play_turn(&mut self, action: Action) -> Result<(), GameError> {
-        self.handle_action(action);
+        self.handle_action(action)?;
         self.state_logic();
 
         Ok(())
@@ -203,14 +202,22 @@ impl Game {
         everyone_has_the_same_bet
     }
 
-    fn next_round(game_state: &mut GameState) {
-        game_state.round = game_state.round.next_round_name();
-        let new_card = game_state.deck.draw_card();
-        game_state.board.add_card(new_card.unwrap());
-        game_state.current_seat = game_state.next_valid_seat(game_state.sb_seat);
+    fn next_round(game_state: &mut GameState) -> Result<(), GameError> {
+        game_state.round = game_state.round.next_round_name()?;
+        if game_state.round == Round::Flop {
+            for i in 0..3 {
+                let new_card = game_state.deck.draw_card();
+                game_state.board.add_card(new_card.unwrap()).unwrap();
+            }
+        } else {
+            let new_card = game_state.deck.draw_card();
+            game_state.board.add_card(new_card.unwrap())?;
+        }
+        game_state.current_seat = game_state.sb_seat;
+        Ok(())
     }
 
-    fn next_hand(game_state: &mut GameState) {
+    fn next_hand(settings: &Settings, game_state: &mut GameState) -> Result<(), CardError> {
         // end current hand:
         //   - check for winner(s)
         //   - update winner(s) stack(s)
@@ -224,13 +231,19 @@ impl Game {
         game_state.sb_seat = game_state.next_valid_seat(game_state.sb_seat);
         //   - change current player
         game_state.current_seat = game_state.sb_seat;
+        //  - put blinds
+        Game::raise(game_state, settings.small_blind);
+        game_state.current_seat = game_state.next_valid_seat(game_state.current_seat);
+        Game::raise(game_state, settings.big_blind);
+        game_state.current_seat = game_state.next_valid_seat(game_state.current_seat);
+
         //   - deal new hand
         game_state.deck = Deck::new();
         game_state.deck.shuffle(&mut rand::rng());
-        game_state
-            .seats
-            .iter_mut()
-            .for_each(|seat| seat.hand = Some(game_state.deck.draw_hand().unwrap()));
+        game_state.seats.iter_mut().try_for_each(|seat| {
+            seat.hand = Some(game_state.deck.draw_hand()?);
+            Ok(())
+        })?;
     }
 
     fn is_hand_over(&self) -> bool {
@@ -239,7 +252,7 @@ impl Game {
 
     fn state_logic(&mut self) {
         if self.is_hand_over() {
-            Self::next_hand(&mut self.game_state);
+            Game::next_hand(&self.settings, &mut self.game_state);
             return;
         }
 
@@ -251,38 +264,52 @@ impl Game {
         self.next_turn();
     }
 
-    fn handle_action(&mut self, action: Action) {
+    fn raise(game_state: &mut GameState, amount: usize) -> Result<(), GameError> {
+        let mut current_seat = game_state.seats[game_state.current_seat];
+        if current_seat.stack > amount && amount >= 2 * game_state.current_raise {
+            current_seat.bet += amount;
+            current_seat.stack -= amount;
+            game_state.current_raise = amount;
+            game_state.current_bet += amount;
+            Ok(())
+        } else if current_seat.stack == amount {
+            current_seat.bet += amount;
+            current_seat.stack -= amount;
+            game_state.current_raise = amount.max(game_state.current_raise);
+            game_state.current_bet = game_state.current_bet.max(current_seat.bet);
+            Ok(())
+        } else {
+            Err(GameError::InvalidRaise)
+        }
+    }
+
+    fn handle_action(&mut self, action: Action) -> Result<(), GameError> {
         let mut current_seat = self.game_state.seats[self.game_state.current_seat];
         match action {
-            Action::Fold => current_seat.is_folded = true,
+            Action::Fold => {
+                current_seat.is_folded = true;
+                Ok(())
+            }
             Action::Raise(amount) => {
-                if amount > 0 && current_seat.stack >= amount {
-                    current_seat.bet += amount;
-                    current_seat.stack -= amount
-                } else {
-                    panic!()
-                }
+                Self::raise(&mut self.game_state, amount);
+                Ok(())
             }
             Action::Call => {
-                let previous_seat = self.game_state.seats[self
-                    .game_state
-                    .previous_valid_seat(self.game_state.current_seat)];
-                let amount = previous_seat.bet - current_seat.bet;
-                if amount > 0 && current_seat.stack >= amount {
-                    self.game_state.seats[self.game_state.current_seat].bet += amount;
-                    self.game_state.seats[self.game_state.current_seat].stack -= amount
+                let amount = self.game_state.current_bet - current_seat.bet;
+                if current_seat.stack >= amount {
+                    current_seat.bet += amount;
+                    current_seat.stack -= amount;
+                    Ok(())
                 } else {
-                    panic!()
+                    Err(GameError::InvalidAction)
                 }
             }
             Action::Check => {
-                let previous_seat = self.game_state.seats[self
-                    .game_state
-                    .previous_valid_seat(self.game_state.current_seat)];
-                let amount = previous_seat.bet - current_seat.bet;
+                let amount = self.game_state.current_bet - current_seat.bet;
                 if amount != 0 {
-                    panic!()
+                    return Err(GameError::InvalidAction);
                 }
+                Ok(())
             }
         }
     }
@@ -308,7 +335,7 @@ impl Game {
 struct ObservableState {}
 
 impl From<&Game> for ObservableState {
-    fn from(value: &Game) -> Self {
+    fn from(_value: &Game) -> Self {
         Self {}
     }
 }
@@ -327,6 +354,8 @@ fn functional_test() -> Result<(), GameError> {
     let settings = Settings {
         n_players: n,
         initial_stack: 1000,
+        small_blind: 10,
+        big_blind: 20,
     };
     let players = vec![Player::new(); n];
     let mut game = Game::new(settings);
