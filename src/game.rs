@@ -33,16 +33,6 @@ impl Round {
         }
     }
 
-    fn from_card_count(n: usize) -> Result<Self, GameError> {
-        match n {
-            0 => Ok(Round::PreFlop),
-            3 => Ok(Round::Flop),
-            4 => Ok(Round::Turn),
-            5 => Ok(Round::River),
-            _ => Err(GameError::InvalidRoundCardCount),
-        }
-    }
-
     fn next_round_name(&self) -> Result<Self, GameError> {
         match self {
             Round::PreFlop => Ok(Round::Flop),
@@ -160,12 +150,6 @@ impl Game {
             .next_playing_seat(self.game_state.current_seat);
     }
 
-    fn update_round(&mut self) -> Result<(), GameError> {
-        let card_count = self.game_state.board.card_count();
-        self.game_state.round = Round::from_card_count(card_count)?;
-        Ok(())
-    }
-
     fn is_round_over(game_state: &GameState) -> bool {
         if !game_state.seats.iter().any(|seat| seat.is_valid()) {
             return true;
@@ -202,7 +186,7 @@ impl Game {
     fn next_round(game_state: &mut GameState) -> Result<(), GameError> {
         game_state.round = game_state.round.next_round_name()?;
         if game_state.round == Round::Flop {
-            for i in 0..3 {
+            for _ in 0..3 {
                 let new_card = game_state.deck.draw_card();
                 game_state.board.add_card(new_card.unwrap()).unwrap();
             }
@@ -229,9 +213,9 @@ impl Game {
         //   - change current player
         game_state.current_seat = game_state.sb_seat;
         //  - put blinds
-        Game::raise(game_state, settings.small_blind);
+        Game::raise(game_state, settings.small_blind).unwrap();
         game_state.current_seat = game_state.next_playing_seat(game_state.current_seat);
-        Game::raise(game_state, 2 * settings.small_blind);
+        Game::raise(game_state, 2 * settings.small_blind).unwrap();
         game_state.current_seat = game_state.next_playing_seat(game_state.current_seat);
 
         //   - deal new hand
@@ -250,14 +234,14 @@ impl Game {
         if self.is_hand_over() {
             self.game_state.current_bet = 0;
             self.game_state.current_raise = 0;
-            Game::next_hand(&self.settings, &mut self.game_state);
+            Game::next_hand(&self.settings, &mut self.game_state).unwrap();
             return;
         }
 
         if Self::is_round_over(&self.game_state) {
             self.game_state.current_bet = 0;
             self.game_state.current_raise = 0;
-            Self::next_round(&mut self.game_state);
+            Self::next_round(&mut self.game_state).unwrap();
             return;
         }
 
@@ -267,17 +251,12 @@ impl Game {
     fn raise(game_state: &mut GameState, amount_to_bet: usize) -> Result<(), GameError> {
         let mut current_seat = game_state.seats[game_state.current_seat];
         if current_seat.stack > amount_to_bet - current_seat.bet
-            && amount_to_bet >= 2 * game_state.current_raise - current_seat.bet
+            && amount_to_bet >= 2 * game_state.current_raise - game_state.current_bet
         {
-            game_state.current_raise = amount_to_bet - current_seat.bet;
-            current_seat.stack -= game_state.current_raise;
-            current_seat.bet = amount_to_bet;
-            Ok(())
-        } else if current_seat.stack == amount_to_bet - current_seat.bet {
-            current_seat.stack = 0;
             game_state.current_raise = game_state
                 .current_raise
-                .max(amount_to_bet - current_seat.bet);
+                .max(amount_to_bet - game_state.current_bet);
+            current_seat.stack -= game_state.current_raise;
             current_seat.bet = amount_to_bet;
             game_state.current_bet = game_state.current_bet.max(current_seat.bet);
             Ok(())
@@ -293,7 +272,7 @@ impl Game {
                 current_seat.is_folded = true;
             }
             Action::Raise(amount_to_bet) => {
-                Self::raise(&mut self.game_state, amount_to_bet);
+                Self::raise(&mut self.game_state, amount_to_bet).unwrap();
             }
             Action::Call => {
                 let amount_to_put = self.game_state.current_bet.saturating_sub(current_seat.bet);
