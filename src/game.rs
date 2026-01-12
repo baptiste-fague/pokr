@@ -250,8 +250,14 @@ impl Game {
 
     fn raise(game_state: &mut GameState, amount_to_bet: usize) -> Result<(), GameError> {
         let mut current_seat = game_state.seats[game_state.current_seat];
-        if current_seat.stack > amount_to_bet - current_seat.bet
-            && amount_to_bet >= 2 * game_state.current_raise - game_state.current_bet
+        let min_raise = game_state.current_bet + game_state.current_raise;
+        if current_seat.stack >= amount_to_bet - current_seat.bet  // check if money is where your mouth is
+            && (
+                current_seat.stack >= min_raise
+                    && amount_to_bet >= game_state.current_raise + game_state.current_bet
+                    || current_seat.stack < min_raise
+                        && amount_to_bet > game_state.current_bet
+            )
         {
             game_state.current_raise = game_state
                 .current_raise
@@ -318,7 +324,7 @@ impl From<&Game> for ObservableState {
 #[derive(Clone, Copy)]
 pub enum Action {
     Fold,
-    Raise(usize),
+    Raise(usize), // takes the player's total_bet after the turn (not the additional money) as argument
     Call,
     Check,
 }
