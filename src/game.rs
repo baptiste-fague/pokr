@@ -260,19 +260,21 @@ impl Game {
         self.next_turn();
     }
 
-    fn raise(game_state: &mut GameState, amount: usize) -> Result<(), GameError> {
+    fn raise(game_state: &mut GameState, amount_to_bet: usize) -> Result<(), GameError> {
         let mut current_seat = game_state.seats[game_state.current_seat];
-        if current_seat.stack > amount - current_seat.bet
-            && amount >= 2 * game_state.current_raise - current_seat.bet
+        if current_seat.stack > amount_to_bet - current_seat.bet
+            && amount_to_bet >= 2 * game_state.current_raise - current_seat.bet
         {
-            game_state.current_raise = amount - current_seat.bet;
+            game_state.current_raise = amount_to_bet - current_seat.bet;
             current_seat.stack -= game_state.current_raise;
-            current_seat.bet = amount;
+            current_seat.bet = amount_to_bet;
             Ok(())
-        } else if current_seat.stack == amount - current_seat.bet {
+        } else if current_seat.stack == amount_to_bet - current_seat.bet {
             current_seat.stack = 0;
-            game_state.current_raise = game_state.current_raise.max(amount - current_seat.bet);
-            current_seat.bet = amount;
+            game_state.current_raise = game_state
+                .current_raise
+                .max(amount_to_bet - current_seat.bet);
+            current_seat.bet = amount_to_bet;
             game_state.current_bet = game_state.current_bet.max(current_seat.bet);
             Ok(())
         } else {
@@ -286,8 +288,8 @@ impl Game {
             Action::Fold => {
                 current_seat.is_folded = true;
             }
-            Action::Raise(amount) => {
-                Self::raise(&mut self.game_state, amount);
+            Action::Raise(amount_to_bet) => {
+                Self::raise(&mut self.game_state, amount_to_bet);
             }
             Action::Call => {
                 let amount_to_put = self.game_state.current_bet.saturating_sub(current_seat.bet);
