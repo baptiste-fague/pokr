@@ -55,8 +55,8 @@ impl Round {
 
 pub struct GameState {
     current_seat: usize,
-    current_bet: usize,
-    current_raise: usize,
+    current_bet: usize, //maximum total amount bet by a player so far during the hand
+    current_raise: usize, //maximum raise (amount_bet - amount_bet_by_previous_player) so far during the hand
 
     deck: Deck,
     board: Board,
@@ -99,7 +99,6 @@ pub struct Seat {
     pub hand: Option<PlayerHand>,
     pub stack: usize,
     pub bet: usize,
-    pub total_bets: usize,
     pub is_folded: bool,
     pub is_dead: bool,
     pub last_action_in_current_round: Option<Action>,
@@ -111,7 +110,6 @@ impl Seat {
             hand: None,
             stack,
             bet: 0,
-            total_bets: 0,
             is_folded: false,
             is_dead: false,
             last_action_in_current_round: None,
@@ -128,7 +126,6 @@ pub struct Settings {
     pub n_players: usize,
     pub initial_stack: usize,
     pub small_blind: usize,
-    pub big_blind: usize,
 }
 
 impl Game {
@@ -136,7 +133,7 @@ impl Game {
         Game {
             game_state: GameState {
                 current_seat: 0,
-                current_bet: settings.big_blind,
+                current_bet: 2 * settings.small_blind,
                 current_raise: 0,
                 deck: Deck::new(),
                 board: Board::new(),
@@ -211,7 +208,7 @@ impl Game {
             }
         } else {
             let new_card = game_state.deck.draw_card();
-            game_state.board.add_card(new_card.unwrap())?;
+            game_state.board.add_card(new_card.unwrap()).unwrap();
         }
         game_state.current_seat = game_state.sb_seat;
         Ok(())
@@ -234,12 +231,11 @@ impl Game {
         //  - put blinds
         Game::raise(game_state, settings.small_blind);
         game_state.current_seat = game_state.next_valid_seat(game_state.current_seat);
-        Game::raise(game_state, settings.big_blind);
+        Game::raise(game_state, 2 * settings.small_blind);
         game_state.current_seat = game_state.next_valid_seat(game_state.current_seat);
 
         //   - deal new hand
         game_state.deck = Deck::new();
-        game_state.deck.shuffle(&mut rand::rng());
         game_state.seats.iter_mut().try_for_each(|seat| {
             seat.hand = Some(game_state.deck.draw_hand()?);
             Ok(())
@@ -266,16 +262,17 @@ impl Game {
 
     fn raise(game_state: &mut GameState, amount: usize) -> Result<(), GameError> {
         let mut current_seat = game_state.seats[game_state.current_seat];
-        if current_seat.stack > amount && amount >= 2 * game_state.current_raise {
-            current_seat.bet += amount;
-            current_seat.stack -= amount;
-            game_state.current_raise = amount;
-            game_state.current_bet += amount;
+        if current_seat.stack > amount - current_seat.bet
+            && amount >= 2 * game_state.current_raise - current_seat.bet
+        {
+            game_state.current_raise = amount - current_seat.bet;
+            current_seat.stack -= game_state.current_raise;
+            current_seat.bet = amount;
             Ok(())
-        } else if current_seat.stack == amount {
-            current_seat.bet += amount;
-            current_seat.stack -= amount;
-            game_state.current_raise = amount.max(game_state.current_raise);
+        } else if current_seat.stack == amount - current_seat.bet {
+            current_seat.stack = 0;
+            game_state.current_raise = game_state.current_raise.max(amount - current_seat.bet);
+            current_seat.bet = amount;
             game_state.current_bet = game_state.current_bet.max(current_seat.bet);
             Ok(())
         } else {
@@ -288,30 +285,23 @@ impl Game {
         match action {
             Action::Fold => {
                 current_seat.is_folded = true;
-                Ok(())
             }
             Action::Raise(amount) => {
                 Self::raise(&mut self.game_state, amount);
-                Ok(())
             }
             Action::Call => {
-                let amount = self.game_state.current_bet - current_seat.bet;
-                if current_seat.stack >= amount {
-                    current_seat.bet += amount;
-                    current_seat.stack -= amount;
-                    Ok(())
-                } else {
-                    Err(GameError::InvalidAction)
-                }
+                let amount_to_put = self.game_state.current_bet.saturating_sub(current_seat.bet);
+                current_seat.bet += amount_to_put;
+                current_seat.stack -= amount_to_put;
             }
             Action::Check => {
                 let amount = self.game_state.current_bet - current_seat.bet;
                 if amount != 0 {
                     return Err(GameError::InvalidAction);
                 }
-                Ok(())
             }
         }
+        Ok(())
     }
 
     pub fn current_seat(&self) -> usize {
@@ -355,7 +345,6 @@ fn functional_test() -> Result<(), GameError> {
         n_players: n,
         initial_stack: 1000,
         small_blind: 10,
-        big_blind: 20,
     };
     let players = vec![Player::new(); n];
     let mut game = Game::new(settings);
