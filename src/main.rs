@@ -13,7 +13,6 @@ fn main() -> Result<(), GameError> {
         n_players: n,
         initial_stack: 1000,
         small_blind: 10,
-        big_blind: 20,
     };
     let players = vec![Player::new(); n];
     let mut game = Game::new(settings);

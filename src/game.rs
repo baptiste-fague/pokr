@@ -157,7 +157,7 @@ impl Game {
     fn next_turn(&mut self) {
         self.game_state.current_seat = self
             .game_state
-            .next_valid_seat(self.game_state.current_seat);
+            .next_playing_seat(self.game_state.current_seat);
     }
 
     fn update_round(&mut self) -> Result<(), GameError> {
@@ -225,14 +225,14 @@ impl Game {
         //   - update round
         game_state.round = Round::PreFlop;
         //   - change sb
-        game_state.sb_seat = game_state.next_valid_seat(game_state.sb_seat);
+        game_state.sb_seat = game_state.next_playing_seat(game_state.sb_seat);
         //   - change current player
         game_state.current_seat = game_state.sb_seat;
         //  - put blinds
         Game::raise(game_state, settings.small_blind);
-        game_state.current_seat = game_state.next_valid_seat(game_state.current_seat);
+        game_state.current_seat = game_state.next_playing_seat(game_state.current_seat);
         Game::raise(game_state, 2 * settings.small_blind);
-        game_state.current_seat = game_state.next_valid_seat(game_state.current_seat);
+        game_state.current_seat = game_state.next_playing_seat(game_state.current_seat);
 
         //   - deal new hand
         game_state.deck = Deck::new();
@@ -248,11 +248,15 @@ impl Game {
 
     fn state_logic(&mut self) {
         if self.is_hand_over() {
+            self.game_state.current_bet = 0;
+            self.game_state.current_raise = 0;
             Game::next_hand(&self.settings, &mut self.game_state);
             return;
         }
 
         if Self::is_round_over(&self.game_state) {
+            self.game_state.current_bet = 0;
+            self.game_state.current_raise = 0;
             Self::next_round(&mut self.game_state);
             return;
         }
