@@ -68,11 +68,11 @@ pub struct GameState {
 }
 
 impl GameState {
-    fn next_valid_seat(&self, seat: usize) -> usize {
+    fn next_playing_seat(&self, seat: usize) -> usize {
         let mut next_seat = seat;
         loop {
             next_seat = (next_seat + 1) % self.seats.len();
-            if self.is_seat_valid(next_seat) {
+            if self.is_seat_valid(next_seat) && self.seats[next_seat].stack != 0 {
                 break;
             }
         }
