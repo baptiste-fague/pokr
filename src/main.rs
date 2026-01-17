@@ -7,6 +7,26 @@ mod turn;
 use game::*;
 use player::*;
 
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum GameError {
+    #[error("Action is invalid")]
+    InvalidAction,
+    #[error("Invalid round card count")]
+    InvalidRoundCardCount,
+    #[error("Invalid raise amount")]
+    InvalidRaise,
+    #[error("Unexpected next_round call during River")]
+    InvalidRoundCall,
+    #[error("Tried to add a card to a full board")]
+    BoardOverflow,
+    #[error("Invalid poker hand card count")]
+    InvalidPokerHandCardCount,
+    #[error("Tried to draw from an empty deck")]
+    EmptyDeck,
+}
+
 fn main() -> Result<(), GameError> {
     let n = 3;
     let settings = Settings {
@@ -15,7 +35,7 @@ fn main() -> Result<(), GameError> {
         small_blind: 10,
     };
     let players = vec![Player::new(); n];
-    let mut game = Game::new(settings);
+    let mut game = Game::new(settings)?;
 
     while !game.over() {
         let seat_number = game.current_seat();
