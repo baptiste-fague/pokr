@@ -1,4 +1,4 @@
-use crate::*;
+use crate::action::Action;
 
 #[derive(Clone, Copy)]
 pub struct Player {}

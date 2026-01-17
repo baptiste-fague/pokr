@@ -1,5 +1,8 @@
+mod action;
 mod card;
 mod game;
+mod game_state;
+mod hand;
 mod player;
 mod round;
 mod turn;
@@ -37,7 +40,7 @@ fn main() -> Result<(), GameError> {
     let players = vec![Player::new(); n];
     let mut game = Game::new(settings)?;
 
-    while !game.over() {
+    while !game.is_over() {
         let seat_number = game.current_seat();
 
         let mut player = players[seat_number];
