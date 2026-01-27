@@ -55,10 +55,6 @@ impl Board {
         Ok(())
     }
 
-    pub fn card_count(&self) -> usize {
-        self.card_count
-    }
-
     pub fn cards(&self) -> impl Iterator<Item = &Card> {
         self.cards.iter().filter_map(|c| c.as_ref())
     }

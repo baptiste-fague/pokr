@@ -1,5 +1,5 @@
 use crate::{GameError, card::*};
-use rand::{RngCore, seq::SliceRandom};
+use rand::seq::SliceRandom;
 
 #[derive(Debug)]
 pub struct Deck {
@@ -20,10 +20,6 @@ impl Deck {
         Ok(PlayerHand {
             cards: [card1, card2],
         })
-    }
-
-    pub fn shuffle(&mut self, rng: &mut impl RngCore) {
-        self.deck.shuffle(rng)
     }
 
     pub fn new() -> Self {
