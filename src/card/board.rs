@@ -1,7 +1,8 @@
 use itertools::Itertools;
 
-use crate::card::*;
+use crate::{GameError, card::*};
 
+#[derive(Debug)]
 pub struct Board {
     card_count: usize,
     cards: [Option<Card>; 5],
@@ -15,7 +16,19 @@ impl Board {
         }
     }
 
-    pub fn best_poker_hand(&self, player_hand: &PlayerHand) -> Result<PokerHand, CardError> {
+    pub fn from_cards(cards: Vec<Card>) -> Board {
+        assert!(cards.len() <= 5);
+        let card_count = cards.len();
+        let cards = cards
+            .into_iter()
+            .map(Some)
+            .chain(std::iter::repeat_n(None, 5 - card_count))
+            .collect_array::<5>()
+            .unwrap();
+        Self { card_count, cards }
+    }
+
+    pub fn best_poker_hand(&self, player_hand: &PlayerHand) -> Result<PokerHand, GameError> {
         let mut best_hand = None;
 
         for h in player_hand
@@ -33,20 +46,16 @@ impl Board {
         Ok(best_hand.unwrap())
     }
 
-    pub fn add_card(&mut self, card: Card) -> Result<(), CardError> {
+    pub fn add_card(&mut self, card: Card) -> Result<(), GameError> {
         if self.card_count >= 5 {
-            return Err(CardError::BoardOverflow);
+            return Err(GameError::BoardOverflow);
         }
         self.cards[self.card_count] = Some(card);
         self.card_count += 1;
         Ok(())
     }
 
-    pub fn card_count(&self) -> usize {
-        self.card_count
-    }
-
-    pub fn cards<'a>(&'a self) -> impl Iterator<Item = &'a Card> {
+    pub fn cards(&self) -> impl Iterator<Item = &Card> {
         self.cards.iter().filter_map(|c| c.as_ref())
     }
 }

@@ -1,17 +1,25 @@
-use crate::card::*;
-use rand::{RngCore, seq::SliceRandom};
+use crate::{GameError, card::*};
+use rand::seq::SliceRandom;
 
+#[derive(Debug)]
 pub struct Deck {
     deck: Vec<Card>,
 }
 
 impl Deck {
-    pub fn draw_card(&mut self) -> Result<Card, CardError> {
-        self.deck.pop().ok_or(CardError::EmptyDeck)
+    pub fn empty() -> Self {
+        Self { deck: vec![] }
+    }
+    pub fn draw_card(&mut self) -> Result<Card, GameError> {
+        self.deck.pop().ok_or(GameError::EmptyDeck)
     }
 
-    pub fn shuffle(&mut self, rng: &mut impl RngCore) {
-        self.deck.shuffle(rng)
+    pub fn draw_hand(&mut self) -> Result<PlayerHand, GameError> {
+        let card1 = self.draw_card()?;
+        let card2 = self.draw_card()?;
+        Ok(PlayerHand {
+            cards: [card1, card2],
+        })
     }
 
     pub fn new() -> Self {
@@ -36,7 +44,7 @@ impl Deck {
                 deck.push(Card { suit, value });
             }
         }
-
-        Self { deck: deck }
+        deck.shuffle(&mut rand::rng());
+        Self { deck }
     }
 }

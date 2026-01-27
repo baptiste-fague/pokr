@@ -1,4 +1,4 @@
-use crate::*;
+use crate::action::Action;
 
 #[derive(Clone, Copy)]
 pub struct Player {}
@@ -8,6 +8,6 @@ impl Player {
         Player {}
     }
     pub fn choose_action(&mut self) -> Action {
-        Action::Check
+        Action::Fold
     }
 }

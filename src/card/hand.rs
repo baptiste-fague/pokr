@@ -1,12 +1,13 @@
-use crate::card::*;
+use crate::{GameError, card::*};
 use itertools::Itertools;
 
+#[derive(Clone, Copy, Debug)]
 pub struct PlayerHand {
-    cards: [Card; 2],
+    pub cards: [Card; 2],
 }
 
 impl PlayerHand {
-    pub fn cards<'a>(&'a self) -> impl Iterator<Item = &'a Card> {
+    pub fn cards(&self) -> impl Iterator<Item = &Card> {
         self.cards.iter()
     }
 }
@@ -17,22 +18,22 @@ pub struct PokerHand {
 }
 
 impl PokerHand {
-    pub fn new<'a>(cards: impl Iterator<Item = &'a Card>) -> Result<Self, CardError> {
+    pub fn new<'a>(cards: impl Iterator<Item = &'a Card>) -> Result<Self, GameError> {
         Ok(Self {
             cards: cards
                 .copied()
                 .collect_array::<5>()
-                .ok_or(CardError::InvalidPokerHandCardCount)?,
+                .ok_or(GameError::InvalidPokerHandCardCount)?,
         })
     }
 
     fn order_remaining_hand(
-        hand_start: impl Iterator<Item = Value>,
+        hand_start: impl Iterator<Item = Value> + std::fmt::Debug,
         bin: &[usize; 13],
     ) -> [Value; 5] {
         hand_start
             .chain(
-                bin.into_iter()
+                bin.iter()
                     .enumerate()
                     .filter_map(|(i, count)| {
                         if *count == 1 {
@@ -56,34 +57,30 @@ impl PokerHand {
                 let index_value = bins
                     .iter()
                     .enumerate()
-                    .filter(|(_, count)| **count == 4)
-                    .next()
+                    .find(|(_, count)| **count == 4)
                     .unwrap()
                     .0;
 
                 let value = Value::from_index(index_value);
 
-                PokerHand::order_remaining_hand(std::iter::repeat(value).take(4), &bins)
+                PokerHand::order_remaining_hand(std::iter::repeat_n(value, 4), &bins)
             }
             HandType::FullHouse => {
                 let value_index_3 = bins
                     .iter()
                     .enumerate()
-                    .filter(|(_, count)| **count == 3)
-                    .next()
+                    .find(|(_, count)| **count == 3)
                     .unwrap()
                     .0;
                 let value_index_2 = bins
                     .iter()
                     .enumerate()
-                    .filter(|(_, count)| **count == 2)
-                    .next()
+                    .find(|(_, count)| **count == 2)
                     .unwrap()
                     .0;
 
-                std::iter::repeat(Value::from_index(value_index_3))
-                    .take(3)
-                    .chain(std::iter::repeat(Value::from_index(value_index_2)).take(2))
+                std::iter::repeat_n(Value::from_index(value_index_3), 3)
+                    .chain(std::iter::repeat_n(Value::from_index(value_index_2), 2))
                     .collect_array::<5>()
                     .unwrap()
             }
@@ -93,14 +90,13 @@ impl PokerHand {
                 let value_index = bins
                     .iter()
                     .enumerate()
-                    .filter(|(_, count)| **count == 3)
-                    .next()
+                    .find(|(_, count)| **count == 3)
                     .unwrap()
                     .0;
 
                 let value = Value::from_index(value_index);
 
-                PokerHand::order_remaining_hand(std::iter::repeat(value).take(3), &bins)
+                PokerHand::order_remaining_hand(std::iter::repeat_n(value, 3), &bins)
             }
             HandType::DoublePair => {
                 let (value_low, value_high) = bins
@@ -117,9 +113,7 @@ impl PokerHand {
                     .unwrap();
 
                 PokerHand::order_remaining_hand(
-                    std::iter::repeat(value_high)
-                        .take(2)
-                        .chain(std::iter::repeat(value_low).take(2)),
+                    std::iter::repeat_n(value_high, 2).chain(std::iter::repeat_n(value_low, 2)),
                     &bins,
                 )
             }
@@ -127,14 +121,13 @@ impl PokerHand {
                 let value_index = bins
                     .iter()
                     .enumerate()
-                    .filter(|(_, count)| **count == 2)
-                    .next()
+                    .find(|(_, count)| **count == 2)
                     .unwrap()
                     .0;
 
                 let value = Value::from_index(value_index);
 
-                PokerHand::order_remaining_hand(std::iter::repeat(value).take(2), &bins)
+                PokerHand::order_remaining_hand(std::iter::repeat_n(value, 2), &bins)
             }
             HandType::HighCard => PokerHand::order_remaining_hand(std::iter::empty(), &bins),
         }
@@ -170,9 +163,14 @@ impl PokerHand {
                 bins.into_iter().any(|count| count == 5)
             }
             HandType::Straight => {
-                let bins = indexed_bins(self.cards.iter().map(|c| &c.suit));
+                let bins = indexed_bins(self.cards.iter().map(|c| &c.value));
+                if bins.iter().any(|&v| v > 1) {
+                    return false;
+                }
+                // value included
                 let mut low_i = 12;
-                let mut high_i = 3;
+                // value excluded
+                let mut high_i = 4;
                 let mut sum = bins.iter().cycle().skip(12).take(5).sum::<usize>();
 
                 while high_i < 13 {
@@ -180,7 +178,8 @@ impl PokerHand {
                         return true;
                     }
 
-                    sum += bins[high_i] - bins[low_i];
+                    sum += bins[high_i];
+                    sum -= bins[low_i];
                     high_i += 1;
                     low_i = (low_i + 1) % 13;
                 }
@@ -245,19 +244,13 @@ fn card_ordering() {
 
 impl Ord for PokerHand {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
-    }
-}
-
-impl PartialOrd for PokerHand {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         let hand_type = self.best_hand_type();
         let other_hand_type = other.best_hand_type();
 
         if hand_type.strength() < other_hand_type.strength() {
-            return Some(std::cmp::Ordering::Less);
+            return std::cmp::Ordering::Less;
         } else if hand_type.strength() > other_hand_type.strength() {
-            return Some(std::cmp::Ordering::Greater);
+            return std::cmp::Ordering::Greater;
         }
 
         let ordered_values = self.get_hand_ordering(hand_type);
@@ -265,17 +258,23 @@ impl PartialOrd for PokerHand {
 
         for i in 0..5 {
             if ordered_values[i].number_value() < other_ordered_values[i].number_value() {
-                return Some(std::cmp::Ordering::Less);
+                return std::cmp::Ordering::Less;
             } else if ordered_values[i].number_value() > other_ordered_values[i].number_value() {
-                return Some(std::cmp::Ordering::Greater);
+                return std::cmp::Ordering::Greater;
             }
         }
 
-        Some(std::cmp::Ordering::Equal)
+        std::cmp::Ordering::Equal
     }
 }
 
-#[derive(Clone)]
+impl PartialOrd for PokerHand {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum HandType {
     StraightFlush,
     FourOfAKind,

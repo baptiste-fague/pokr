@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{action::Action, *};
 
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::*;
@@ -13,11 +13,18 @@ pub struct PySettings {
 #[pymethods]
 impl PySettings {
     #[new]
-    pub fn new(n_players: usize, initial_stack: usize) -> Self {
+    pub fn new(
+        n_players: usize,
+        initial_stack: usize,
+        small_blind: usize,
+        max_hands: usize,
+    ) -> Self {
         PySettings {
             settings: Settings {
                 n_players,
                 initial_stack,
+                small_blind,
+                max_hands,
             },
         }
     }
@@ -73,7 +80,7 @@ impl PyGame {
     #[new]
     pub fn new(settings: &PySettings) -> Self {
         PyGame {
-            game: Game::new(settings.settings.to_owned()),
+            game: Game::new(settings.settings.to_owned()).unwrap(),
         }
     }
 
@@ -83,6 +90,10 @@ impl PyGame {
 
     pub fn current_seat(&self) -> usize {
         self.game.current_seat()
+    }
+
+    pub fn is_over(&self) -> bool {
+        self.game.is_over()
     }
 }
 

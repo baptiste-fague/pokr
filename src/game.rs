@@ -1,77 +1,14 @@
+use log::debug;
+
+use crate::action::Action;
 use crate::card::*;
+use crate::game_state::{GameState, Seat};
+use crate::hand::Hand;
+use crate::round::Round;
 use crate::*;
 
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum GameError {
-    #[error("Action is invalid")]
-    InvalidAction,
-    #[error("Invalid round card count")]
-    InvalidRoundCardCount,
-}
-
-#[derive(PartialEq, Eq)]
-pub enum Round {
-    PreFlop,
-    Flop,
-    Turn,
-    River,
-}
-
-impl Round {
-    fn n_cards(&self) -> usize {
-        match self {
-            Round::PreFlop => 0,
-            Round::Flop => 3,
-            Round::Turn => 4,
-            Round::River => 5,
-        }
-    }
-
-    fn from_card_count(n: usize) -> Result<Self, GameError> {
-        match n {
-            0 => Ok(Round::PreFlop),
-            3 => Ok(Round::Flop),
-            4 => Ok(Round::Turn),
-            5 => Ok(Round::River),
-            _ => Err(GameError::InvalidRoundCardCount),
-        }
-    }
-}
-
-pub struct GameState {
-    current_seat: usize,
-
-    board: Board,
-
-    seats: Vec<Seat>,
-    sb_seat: usize,
-
-    pot: usize,
-
-    round: Round,
-}
-
-impl GameState {
-    fn next_valid_seat(&self, seat: usize) -> usize {
-        let mut next_seat = seat;
-        loop {
-            next_seat = (next_seat + 1) % self.seats.len();
-            if self.is_seat_valid(next_seat) {
-                break;
-            }
-        }
-        next_seat
-    }
-
-    fn is_seat_valid(&self, seat: usize) -> bool {
-        self.seats[seat].is_valid()
-    }
-}
-
 pub struct GameData {
-    hand_cound: usize,
+    hand_count: usize,
 }
 
 pub struct Game {
@@ -80,157 +17,97 @@ pub struct Game {
     game_data: GameData,
 }
 
-#[derive(Clone, Copy)]
-pub struct Seat {
-    pub stack: usize,
-    pub bet: usize,
-    pub is_folded: bool,
-    pub is_dead: bool,
-    pub last_action_in_current_round: Option<Action>,
-}
-
-impl Seat {
-    fn new(stack: usize) -> Self {
-        Seat {
-            stack,
-            bet: 0,
-            is_folded: false,
-            is_dead: false,
-            last_action_in_current_round: None,
-        }
-    }
-
-    fn is_valid(&self) -> bool {
-        !self.is_dead && !self.is_folded
-    }
-}
-
 #[derive(Default, Clone)]
 pub struct Settings {
     pub n_players: usize,
     pub initial_stack: usize,
+    pub small_blind: usize,
+    pub max_hands: usize,
 }
 
 impl Game {
-    pub fn new(settings: Settings) -> Game {
-        Game {
-            game_state: GameState {
-                current_seat: 0,
-                board: Board::new(),
-                seats: vec![Seat::new(settings.initial_stack); settings.n_players],
-                sb_seat: 0,
-                pot: 0,
-                round: Round::PreFlop,
-            },
+    pub fn new(settings: Settings) -> Result<Self, GameError> {
+        let mut game_state = GameState {
+            current_seat: 0,
+            current_bet: 0,
+            current_raise: 0,
+            deck: Deck::new(),
+            board: Board::new(),
+            seats: vec![Seat::new(settings.initial_stack); settings.n_players],
+            sb_seat: 0,
+            round: Round::PreFlop,
+        };
+        Hand::start(&mut game_state, settings.small_blind)?;
+
+        Ok(Self {
+            game_state,
             settings,
-            game_data: GameData { hand_cound: 0 },
+            game_data: GameData { hand_count: 0 },
+        })
+    }
+
+    pub fn from_game_state(game_state: GameState, settings: Settings) -> Self {
+        Self {
+            settings,
+            game_state,
+            game_data: GameData { hand_count: 0 },
         }
     }
 
     pub fn play_turn(&mut self, action: Action) -> Result<(), GameError> {
-        self.handle_action(action);
-        self.state_logic();
-
-        Ok(())
+        self.handle_action(action)?;
+        self.state_logic()
     }
 
     /// Go to next valid seat
     fn next_turn(&mut self) {
         self.game_state.current_seat = self
             .game_state
-            .next_valid_seat(self.game_state.current_seat);
+            .next_playing_seat(self.game_state.current_seat);
     }
 
-    fn update_round(&mut self) -> Result<(), GameError> {
-        let card_count = self.game_state.board.card_count();
-        self.game_state.round = Round::from_card_count(card_count)?;
-        Ok(())
-    }
+    fn state_logic(&mut self) -> Result<(), GameError> {
+        debug!("state logic");
 
-    fn is_round_over(game_state: &GameState) -> bool {
-        if !game_state.seats.iter().any(|seat| seat.is_valid()) {
-            return true;
+        // Round logic
+        if !Round::is_over(&self.game_state) {
+            self.next_turn();
+            return Ok(());
         }
 
-        // 1. everyone has played once
-        let everyone_has_played_once = game_state
-            .seats
-            .iter()
-            .all(|seat| !seat.is_valid() || seat.last_action_in_current_round.is_some());
-        if !everyone_has_played_once {
-            return false;
+        debug!("round is over");
+        Round::finish(&mut self.game_state);
+
+        // Hand logic
+        if !Hand::is_over(&self.game_state) {
+            // start next round
+            self.game_state.round = self.game_state.round.next_round_name()?;
+            return Round::start(&mut self.game_state);
         }
 
-        // 2. everyone (except all-in players) has the same bet (max of every valid player including
-        //    all-in players)
-        let max_bet = game_state
-            .seats
-            .iter()
-            .filter_map(|seat| {
-                if seat.is_valid() {
-                    Some(seat.bet)
-                } else {
-                    None
-                }
-            })
-            .max()
-            .unwrap();
-        let everyone_has_the_same_bet = game_state.seats.iter().all(|seat| seat.bet == max_bet);
+        debug!("hand is over");
+        Hand::finish(&mut self.game_state)?;
+        self.game_data.hand_count += 1;
 
-        everyone_has_the_same_bet
-    }
-
-    fn next_round(game_state: &mut GameState) {
-        todo!()
-    }
-
-    fn next_hand(game_state: &mut GameState) {
-        // end current hand:
-        //   - check for winner(s)
-        //   - update winner(s) stack(s)
-        //   - set dead flags
-
-        // next_hand:
-        //   - update round
-        game_state.round = Round::PreFlop;
-        //   - change sb
-        game_state.sb_seat = game_state.next_valid_seat(game_state.sb_seat);
-        //   - change current player
-        game_state.current_seat = game_state.sb_seat;
-        //   - deal new hand
-        todo!()
-    }
-
-    fn is_hand_over(&self) -> bool {
-        Self::is_round_over(&self.game_state) && self.game_state.round == Round::River
-    }
-
-    fn state_logic(&mut self) {
-        if self.is_hand_over() {
-            Self::next_hand(&mut self.game_state);
-            return;
+        // Game logic
+        if self.is_over() {
+            debug!("game is over");
+            return Ok(());
         }
 
-        if Self::is_round_over(&self.game_state) {
-            Self::next_round(&mut self.game_state);
-            return;
-        }
-
-        self.next_turn();
-
-        todo!()
+        self.game_state.sb_seat = self.game_state.next_playing_seat(self.game_state.sb_seat);
+        Hand::start(&mut self.game_state, self.settings.small_blind)
     }
 
-    fn handle_action(&mut self, action: Action) {
-        // todo: check action validity
+    fn handle_action(&mut self, action: Action) -> Result<(), GameError> {
         match action {
-            Action::Fold => self.game_state.seats[self.game_state.current_seat].is_folded = true,
-            Action::Raise(amount) => {
-                self.game_state.seats[self.game_state.current_seat].bet += amount
-            }
-            Action::Call => todo!(),
-            Action::Check => {}
+            Action::Fold => Action::fold(&mut self.game_state),
+            Action::Raise(amount_to_bet) => Action::raise(&mut self.game_state, amount_to_bet)?,
+            Action::Call => Action::call(&mut self.game_state),
+            Action::Check => Action::check(&mut self.game_state)?,
         }
+        self.game_state.current_seat_mut().played_this_round = true;
+        Ok(())
     }
 
     pub fn current_seat(&self) -> usize {
@@ -241,25 +118,23 @@ impl Game {
         self.into()
     }
 
-    pub fn over(&self) -> bool {
-        false
+    pub fn is_over(&self) -> bool {
+        self.game_state
+            .seats
+            .iter()
+            .filter(|seat| !seat.is_dead)
+            .count()
+            == 1
+            || self.game_data.hand_count >= self.settings.max_hands
     }
 }
 
 struct ObservableState {}
 
 impl From<&Game> for ObservableState {
-    fn from(value: &Game) -> Self {
+    fn from(_value: &Game) -> Self {
         Self {}
     }
-}
-
-#[derive(Clone, Copy)]
-pub enum Action {
-    Fold,
-    Raise(usize),
-    Call,
-    Check,
 }
 
 #[test]
@@ -268,17 +143,130 @@ fn functional_test() -> Result<(), GameError> {
     let settings = Settings {
         n_players: n,
         initial_stack: 1000,
+        small_blind: 10,
+        max_hands: 1000,
     };
     let players = vec![Player::new(); n];
-    let mut game = Game::new(settings);
+    let mut game = Game::new(settings)?;
 
-    while !game.over() {
+    while !game.is_over() {
         let seat_number = game.current_seat();
 
         let mut player = players[seat_number];
         let action = player.choose_action();
         game.play_turn(action)?;
     }
+
+    Ok(())
+}
+
+#[test]
+fn unit_test() -> Result<(), GameError> {
+    let n = 3;
+    let settings = Settings {
+        n_players: n,
+        initial_stack: 1000,
+        small_blind: 10,
+        max_hands: 1000,
+    };
+    let game_state = GameState {
+        current_seat: 2,
+        current_bet: 0,
+        current_raise: 0,
+        deck: Deck::empty(),
+        board: Board::from_cards(vec![
+            Card {
+                suit: Suit::Clubs,
+                value: Value::King,
+            },
+            Card {
+                suit: Suit::Hearts,
+                value: Value::King,
+            },
+            Card {
+                suit: Suit::Spades,
+                value: Value::Queen,
+            },
+            Card {
+                suit: Suit::Clubs,
+                value: Value::Ace,
+            },
+            Card {
+                suit: Suit::Hearts,
+                value: Value::Ace,
+            },
+        ]),
+        seats: vec![
+            Seat {
+                hand: Some(PlayerHand {
+                    cards: [
+                        Card {
+                            suit: Suit::Clubs,
+                            value: Value::Seven,
+                        },
+                        Card {
+                            suit: Suit::Diamonds,
+                            value: Value::Seven,
+                        },
+                    ],
+                }),
+                stack: 0,
+                round_bet: 0,
+                total_bet: 1000,
+                is_folded: false,
+                is_dead: false,
+                played_this_round: false,
+            },
+            Seat {
+                hand: Some(PlayerHand {
+                    cards: [
+                        Card {
+                            suit: Suit::Diamonds,
+                            value: Value::King,
+                        },
+                        Card {
+                            suit: Suit::Hearts,
+                            value: Value::Seven,
+                        },
+                    ],
+                }),
+                stack: 0,
+                round_bet: 0,
+                total_bet: 1000,
+                is_folded: false,
+                is_dead: false,
+                played_this_round: false,
+            },
+            Seat {
+                hand: Some(PlayerHand {
+                    cards: [
+                        Card {
+                            suit: Suit::Spades,
+                            value: Value::Ace,
+                        },
+                        Card {
+                            suit: Suit::Spades,
+                            value: Value::Seven,
+                        },
+                    ],
+                }),
+                stack: 100,
+                round_bet: 0,
+                total_bet: 1000,
+                is_folded: false,
+                is_dead: false,
+                played_this_round: false,
+            },
+        ],
+        sb_seat: 0,
+        round: Round::River,
+    };
+
+    let mut game = Game::from_game_state(game_state, settings);
+
+    game.play_turn(Action::Raise(100))?;
+    assert!(game.is_over());
+    assert_eq!(game.game_state.seats[2].stack, 3100);
 
     Ok(())
 }
