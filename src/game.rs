@@ -22,6 +22,7 @@ pub struct Settings {
     pub n_players: usize,
     pub initial_stack: usize,
     pub small_blind: usize,
+    pub max_hands: usize,
 }
 
 impl Game {
@@ -68,6 +69,7 @@ impl Game {
     fn state_logic(&mut self) -> Result<(), GameError> {
         debug!("state logic");
 
+        // Round logic
         if !Round::is_over(&self.game_state) {
             self.next_turn();
             return Ok(());
@@ -76,6 +78,7 @@ impl Game {
         debug!("round is over");
         Round::finish(&mut self.game_state);
 
+        // Hand logic
         if !Hand::is_over(&self.game_state) {
             // start next round
             self.game_state.round = self.game_state.round.next_round_name()?;
@@ -84,7 +87,9 @@ impl Game {
 
         debug!("hand is over");
         Hand::finish(&mut self.game_state)?;
+        self.game_data.hand_count += 1;
 
+        // Game logic
         if self.is_over() {
             debug!("game is over");
             return Ok(());
@@ -120,6 +125,7 @@ impl Game {
             .filter(|seat| !seat.is_dead)
             .count()
             == 1
+            || self.game_data.hand_count >= self.settings.max_hands
     }
 }
 
@@ -138,6 +144,7 @@ fn functional_test() -> Result<(), GameError> {
         n_players: n,
         initial_stack: 1000,
         small_blind: 10,
+        max_hands: 1000,
     };
     let players = vec![Player::new(); n];
     let mut game = Game::new(settings)?;
@@ -160,6 +167,7 @@ fn unit_test() -> Result<(), GameError> {
         n_players: n,
         initial_stack: 1000,
         small_blind: 10,
+        max_hands: 1000,
     };
     let game_state = GameState {
         current_seat: 2,

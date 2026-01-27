@@ -1,4 +1,4 @@
-use crate::{GameError, game, game_state::GameState};
+use crate::{GameError, game_state::GameState};
 
 #[derive(Clone, Copy)]
 pub enum Action {
@@ -49,6 +49,7 @@ impl Action {
         }
         Ok(())
     }
+
     pub fn fold(game_state: &mut GameState) {
         game_state.current_seat_mut().is_folded = true;
     }

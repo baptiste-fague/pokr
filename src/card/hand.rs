@@ -167,8 +167,10 @@ impl PokerHand {
                 if bins.iter().any(|&v| v > 1) {
                     return false;
                 }
+                // value included
                 let mut low_i = 12;
-                let mut high_i = 3;
+                // value excluded
+                let mut high_i = 4;
                 let mut sum = bins.iter().cycle().skip(12).take(5).sum::<usize>();
 
                 while high_i < 13 {

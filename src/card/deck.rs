@@ -49,6 +49,6 @@ impl Deck {
             }
         }
         deck.shuffle(&mut rand::rng());
-        Self { deck: deck }
+        Self { deck }
     }
 }

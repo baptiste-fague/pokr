@@ -25,10 +25,7 @@ impl Board {
             .chain(std::iter::repeat_n(None, 5 - card_count))
             .collect_array::<5>()
             .unwrap();
-        Self {
-            card_count,
-            cards: cards,
-        }
+        Self { card_count, cards }
     }
 
     pub fn best_poker_hand(&self, player_hand: &PlayerHand) -> Result<PokerHand, GameError> {

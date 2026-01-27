@@ -29,49 +29,64 @@ impl Hand {
     }
 
     pub fn finish(game_state: &mut GameState) -> Result<(), GameError> {
-        // end current hand:
-        //   - check for winner(s)s
-        //   - update winner(s) stack(s)
-        //   - set dead flags
-        // 1. rank the remaining players
-        let mut player_hands = game_state
-            .seats
-            .iter()
-            .enumerate()
-            .filter_map(|(i, s)| {
-                if !s.is_valid() {
-                    return None;
-                }
-                Some((
-                    i,
-                    game_state.board.best_poker_hand(&s.hand.unwrap()).unwrap(),
-                ))
-            })
-            .sorted_by(|(_, h1), (_, h2)| h1.cmp(h2))
-            // todo: remove dynamic allocation here
-            .collect_vec();
-
-        let mut pot: usize = game_state.seats.iter().map(|s| s.total_bet).sum();
-        while pot > 0 {
-            // 2. winner takes from the pot
-            let winner_idx = player_hands.last().unwrap().0;
-            let winner_bet = game_state.seats[winner_idx].total_bet;
-            let winner_gains: usize = game_state
+        if game_state.seats.iter().filter(|s| s.is_valid()).count() == 1 {
+            let gains = game_state
                 .seats
                 .iter_mut()
                 .map(|s| {
-                    // winner can't take more than their bet amount
-                    let gain = s.total_bet.min(winner_bet);
-                    s.total_bet -= gain;
+                    // winner takes it all
+                    let gain = s.total_bet;
+                    s.total_bet = 0;
                     gain
                 })
-                .sum();
+                .sum::<usize>();
+            let valid_seat = game_state.seats.iter_mut().find(|s| s.is_valid()).unwrap();
+            valid_seat.stack += gains;
+        } else {
+            // end current hand:
+            //   - check for winner(s)s
+            //   - update winner(s) stack(s)
+            //   - set dead flags
+            // 1. rank the remaining players
+            let mut player_hands = game_state
+                .seats
+                .iter()
+                .enumerate()
+                .filter_map(|(i, s)| {
+                    if !s.is_valid() {
+                        return None;
+                    }
+                    Some((
+                        i,
+                        game_state.board.best_poker_hand(&s.hand.unwrap()).unwrap(),
+                    ))
+                })
+                .sorted_by(|(_, h1), (_, h2)| h1.cmp(h2))
+                // todo: remove dynamic allocation here
+                .collect_vec();
 
-            game_state.seats[winner_idx].stack += winner_gains;
-            player_hands.pop();
+            let mut pot: usize = game_state.seats.iter().map(|s| s.total_bet).sum();
+            while pot > 0 {
+                // 2. winner takes from the pot
+                let winner_idx = player_hands.last().unwrap().0;
+                let winner_bet = game_state.seats[winner_idx].total_bet;
+                let winner_gains: usize = game_state
+                    .seats
+                    .iter_mut()
+                    .map(|s| {
+                        // winner can't take more than their bet amount
+                        let gain = s.total_bet.min(winner_bet);
+                        s.total_bet -= gain;
+                        gain
+                    })
+                    .sum();
 
-            // build the side pot
-            pot -= winner_gains;
+                game_state.seats[winner_idx].stack += winner_gains;
+                player_hands.pop();
+
+                // build the side pot
+                pot -= winner_gains;
+            }
         }
 
         // update seats states
@@ -85,5 +100,6 @@ impl Hand {
 
     pub fn is_over(game_state: &GameState) -> bool {
         game_state.round == Round::River
+            || game_state.seats.iter().filter(|s| s.is_valid()).count() == 1
     }
 }

@@ -5,7 +5,6 @@ mod game_state;
 mod hand;
 mod player;
 mod round;
-mod turn;
 
 use game::*;
 use player::*;
@@ -16,8 +15,6 @@ use thiserror::Error;
 pub enum GameError {
     #[error("Action is invalid")]
     InvalidAction,
-    #[error("Invalid round card count")]
-    InvalidRoundCardCount,
     #[error("Invalid raise amount")]
     InvalidRaise,
     #[error("Unexpected next_round call during River")]
@@ -28,6 +25,8 @@ pub enum GameError {
     InvalidPokerHandCardCount,
     #[error("Tried to draw from an empty deck")]
     EmptyDeck,
+    #[error("Invalid round")]
+    InvalidRound,
 }
 
 fn main() -> Result<(), GameError> {
@@ -36,6 +35,7 @@ fn main() -> Result<(), GameError> {
         n_players: n,
         initial_stack: 1000,
         small_blind: 10,
+        max_hands: 1000,
     };
     let players = vec![Player::new(); n];
     let mut game = Game::new(settings)?;

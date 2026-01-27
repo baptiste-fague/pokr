@@ -37,7 +37,7 @@ impl Round {
             Round::Flop => 3,
             Round::Turn => 1,
             Round::River => 1,
-            _ => panic!(),
+            _ => return Err(GameError::InvalidRound),
         };
         (0..cards_to_add).try_for_each(|_| {
             let new_card = game_state.deck.draw_card();
@@ -52,6 +52,17 @@ impl Round {
     }
 
     pub fn is_over(game_state: &GameState) -> bool {
+        // 0. everyone has folded except one player
+        let one_player_remains = game_state
+            .seats
+            .iter()
+            .filter(|seat| seat.is_valid())
+            .count()
+            == 1;
+        if one_player_remains {
+            return true;
+        }
+
         // 1. everyone has played once
         let everyone_has_played_once = game_state
             .seats

@@ -8,6 +8,6 @@ impl Player {
         Player {}
     }
     pub fn choose_action(&mut self) -> Action {
-        Action::Check
+        Action::Fold
     }
 }
