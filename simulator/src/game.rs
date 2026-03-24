@@ -114,7 +114,7 @@ impl Game {
         self.game_state.current_seat
     }
 
-    fn get_observable_state(&self) -> ObservableState {
+    pub fn get_observable_state(&self) -> ObservableState {
         self.into()
     }
 
@@ -129,7 +129,7 @@ impl Game {
     }
 }
 
-struct ObservableState {}
+pub struct ObservableState {}
 
 impl From<&Game> for ObservableState {
     fn from(_value: &Game) -> Self {

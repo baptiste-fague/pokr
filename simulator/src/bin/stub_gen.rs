@@ -1,7 +1,7 @@
 use pyo3_stub_gen::Result;
 
 fn main() -> Result<()> {
-    let stub = pokr::pygame::stub_info()?;
+    let stub = simulator::pygame::stub_info()?;
     stub.generate()?;
     Ok(())
 }

@@ -1,11 +1,11 @@
-mod action;
-mod card;
-mod game;
-mod game_state;
-mod hand;
-mod player;
+pub mod action;
+pub mod card;
+pub mod game;
+pub mod game_state;
+pub mod hand;
+pub mod player;
 pub mod pygame;
-mod round;
+pub mod round;
 
 use game::*;
 use player::*;
