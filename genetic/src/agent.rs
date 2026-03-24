@@ -8,6 +8,7 @@ const FLOP_BIN_COUNT: usize = N_BINS * PRE_FLOP_BIN_COUNT;
 const TURN_BIN_COUNT: usize = N_BINS * FLOP_BIN_COUNT;
 const RIVER_BIN_COUNT: usize = N_BINS * TURN_BIN_COUNT;
 
+#[derive(Clone)]
 struct ActionProba {
     raise_p: f32,
     call_check_p: f32,
