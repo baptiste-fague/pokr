@@ -127,6 +127,10 @@ impl Game {
             == 1
             || self.game_data.hand_count >= self.settings.max_hands
     }
+
+    pub fn get_game_state(&self) -> &GameState {
+        &self.game_state
+    }
 }
 
 pub struct ObservableState {}
