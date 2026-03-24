@@ -35,6 +35,7 @@ impl ActionProba {
     }
 }
 
+#[derive(Clone)]
 pub struct Agent {
     pre_flop_data: [ActionProba; PRE_FLOP_BIN_COUNT * VALUES_PER_CARD_SEQUENCE],
     flop_data: [ActionProba; FLOP_BIN_COUNT * VALUES_PER_CARD_SEQUENCE],
