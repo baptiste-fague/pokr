@@ -1,5 +1,6 @@
 use crate::{GameError, card::*};
 use itertools::Itertools;
+use std::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct PlayerHand {
@@ -25,6 +26,37 @@ impl PokerHand {
                 .collect_array::<5>()
                 .ok_or(GameError::InvalidPokerHandCardCount)?,
         })
+    }
+
+    pub fn random_hand_win( board: &Board, agent_hand: &PlayerHand) -> bool {
+        let mut seen = board.cards().cloned().chain(agent_hand.cards().cloned()).collect_vec();
+
+        let mut rejective_filter = |c: &Card| {
+            if seen.contains(c) {
+                false
+            } else {
+                seen.push(c.clone());
+                true
+            }
+        };
+
+        let completed_board: Board = Board::from_cards(board.cards().cloned()
+        .chain(std::iter::repeat_with(Card::random).filter(&mut rejective_filter))
+        .take(5)
+        .collect::<Vec<Card>>());
+    
+        let opponent_cards = std::iter::repeat_with(Card::random)
+        .filter(&mut rejective_filter)
+        .take(2)
+        .collect_array::<2>().unwrap();
+
+        let opponent_hand: PlayerHand = PlayerHand {cards: opponent_cards};
+
+        let best_agent_hand = completed_board.best_poker_hand(agent_hand.cloned().collect());
+        let best_opponent_hand = completed_board.best_poker_hand(opponent_hand.cloned().collect());
+
+        best_agent_hand >= best_opponent_hand
+
     }
 
     fn order_remaining_hand(
