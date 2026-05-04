@@ -1,5 +1,5 @@
 mod board;
-mod deck;
+pub mod deck;
 mod hand;
 
 pub use board::*;

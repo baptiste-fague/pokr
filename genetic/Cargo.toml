@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-itertools = "0.14.0"
-rand = "0.10.0"
-rand_distr = "0.6.0"
+itertools = { workspace = true }
+rand = { workspace = true }
+rand_distr = { workspace = true }
 simulator = {path = "../simulator"}

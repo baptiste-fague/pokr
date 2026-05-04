@@ -133,11 +133,69 @@ impl Game {
     }
 }
 
-pub struct ObservableState {}
+pub struct SeatPublicInfo {
+    pub round_bet: usize,
+    pub stack: usize,
+    pub total_bet: usize,
+    pub is_in_current_round: bool,
+    pub is_dead: bool,
+}
+
+impl From<Seat> for SeatPublicInfo {
+    fn from(value: Seat) -> Self {
+        Self {
+            round_bet: value.round_bet,
+            stack: value.stack,
+            total_bet: value.total_bet,
+            is_in_current_round: !value.is_folded && !value.is_dead,
+            is_dead: value.is_dead,
+        }
+    }
+}
+
+pub struct CurrentPlayerInfo {
+    pub hand: PlayerHand,
+    pub seat_index: usize,
+    pub stack: usize,
+    pub round_bet: usize,
+}
+
+pub struct ObservableState {
+    pub round: Round,
+    pub current_pot: usize,
+    pub min_raise: usize,
+    /// Round bets, indexed by seat number
+    pub seats: Vec<SeatPublicInfo>,
+    pub current_player: CurrentPlayerInfo,
+    pub board: Board,
+}
 
 impl From<&Game> for ObservableState {
-    fn from(_value: &Game) -> Self {
-        Self {}
+    fn from(game: &Game) -> Self {
+        let current_seat_index = game.game_state.current_seat;
+        let current_seat = &game.game_state.seats[current_seat_index];
+
+        debug_assert!(!current_seat.is_folded && !current_seat.is_dead);
+
+        let current_player = CurrentPlayerInfo {
+            hand: current_seat.hand.unwrap(),
+            seat_index: current_seat_index,
+            stack: current_seat.stack,
+            round_bet: current_seat.round_bet,
+        };
+        Self {
+            round: game.game_state.round.clone(),
+            current_pot: game
+                .game_state
+                .seats
+                .iter()
+                .map(|s| s.total_bet + s.round_bet)
+                .sum(),
+            min_raise: game.game_state.current_raise + game.game_state.current_bet,
+            seats: game.game_state.seats.iter().map(|&s| s.into()).collect(),
+            current_player,
+            board: game.game_state.board.clone(),
+        }
     }
 }
 

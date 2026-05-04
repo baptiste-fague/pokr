@@ -1,3 +1,12 @@
 [workspace]
 resolver = "3"
 members = ["genetic","simulator"]
+
+[workspace.dependencies]
+itertools = "0.14.0"
+rand = "0.10"
+rand_distr = "0.6"
+log = "0.4.29"
+pyo3 = { version = "0.27", features = ["extension-module"] }
+pyo3-stub-gen = "0.17.2"
+thiserror = "2.0.17"

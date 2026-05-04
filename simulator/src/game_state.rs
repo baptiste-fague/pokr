@@ -1,7 +1,7 @@
 use crate::card::*;
 use crate::round::Round;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GameState {
     pub current_seat: usize,
     /// maximum total amount bet by a player so far during the hand

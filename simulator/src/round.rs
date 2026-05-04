@@ -1,7 +1,7 @@
 use crate::game_state::GameState;
 use crate::*;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Round {
     PreFlop,
     Flop,

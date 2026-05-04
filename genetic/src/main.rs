@@ -1,6 +1,7 @@
 pub mod agent;
 
 use agent::Agent;
+use agent::Randomizable;
 use itertools::Itertools;
 use rand::Rng;
 use rand::seq::{IndexedRandom, SliceRandom};
@@ -17,7 +18,7 @@ struct GeneticSettings {
 }
 
 fn generate_agents(count: usize, rng: &mut impl Rng) -> Vec<Agent> {
-    (0..count).map(|_| Agent::random_agent(rng)).collect()
+    (0..count).map(|_| Agent::random(rng)).collect()
 }
 
 struct Pairing {
@@ -41,19 +42,29 @@ struct GameResult {
     pub agent0_won: bool,
 }
 
-fn fight(agent0: &Agent, agent1: &Agent, game_settings: &simulator::game::Settings) -> GameResult {
+fn fight(
+    agent0: &Agent,
+    agent1: &Agent,
+    game_settings: &simulator::game::Settings,
+    rng: &mut impl Rng,
+) -> GameResult {
     let mut game = simulator::game::Game::new(game_settings.clone()).unwrap();
+    let mut actions_history = vec![];
     while !game.is_over() {
         let observable_state = game.get_observable_state();
-        if game.current_seat() == 0 {
-            let action = agent0.play_action(&observable_state);
-            game.play_turn(action).unwrap();
+        let action = if game.current_seat() == 0 {
+            agent0.choose_action(&observable_state, &actions_history, rng)
         } else if game.current_seat() == 1 {
-            let action = agent1.play_action(&observable_state);
-            game.play_turn(action).unwrap();
+            agent1.choose_action(&observable_state, &actions_history, rng)
         } else {
             panic!("Unexpected current seat")
-        }
+        };
+        actions_history.push(agent::ActionHistory {
+            action,
+            player: game.current_seat(),
+            round: game.get_game_state().round.clone(),
+        });
+        game.play_turn(action).unwrap();
     }
     let agent0_won = game.get_game_state().seats[0].stack > game.get_game_state().seats[1].stack;
     GameResult { agent0_won }
@@ -148,7 +159,7 @@ fn main() {
             let pairings = pair_agents(agents.len(), &mut rng);
             for pairing in pairings {
                 let (agent0, agent1) = (&agents[pairing.player0], &agents[pairing.player1]);
-                let game_result = fight(agent0, agent1, &game_settings);
+                let game_result = fight(agent0, agent1, &game_settings, &mut rng);
                 update_agent_info(&mut agents_info, &pairing, &game_result);
             }
         }

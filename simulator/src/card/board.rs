@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use crate::{GameError, card::*};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Board {
     card_count: usize,
     cards: [Option<Card>; 5],

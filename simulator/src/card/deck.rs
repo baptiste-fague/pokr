@@ -1,7 +1,7 @@
 use crate::{GameError, card::*};
 use rand::seq::SliceRandom;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Deck {
     deck: Vec<Card>,
 }
