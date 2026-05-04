@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use rand::{Rng, RngExt, rngs::SmallRng};
-use simulator::round::Round;
+use simulator::{card::hand::PokerHand, round::Round};
 use std::{fmt::Debug, time::Instant};
 
 const N_BINS: usize = 10;
@@ -10,6 +10,7 @@ const TURN_BIN_COUNT: usize = N_BINS * FLOP_BIN_COUNT;
 const RIVER_BIN_COUNT: usize = N_BINS * TURN_BIN_COUNT;
 // raise amount in pot proportion
 const RAISE_AMOUNT: f32 = 0.3;
+const N_SAMPLES: usize = 1000;
 
 pub trait Randomizable {
     fn random(rng: &mut impl Rng) -> Self;
@@ -191,10 +192,6 @@ impl Randomizable for Agent {
     }
 }
 
-fn compute_bin(observable_game_state: &simulator::game::ObservableState) -> usize {
-    todo!()
-}
-
 impl Agent {
     pub fn choose_action(
         &self,
@@ -202,7 +199,7 @@ impl Agent {
         actions_history: &[ActionHistory],
         rng: &mut impl Rng,
     ) -> simulator::action::Action {
-        let bin = compute_bin(observable_game_state);
+        let bin = hand_strength(observable_game_state, N_SAMPLES, N_BINS);
 
         let mut actions_grouped: Vec<Vec<&ActionHistory>> = Vec::new();
         for (_, chunk) in &actions_history.iter().chunk_by(|a| &a.round) {
@@ -232,6 +229,21 @@ impl Agent {
         });
         probas.action(current_pot, min_raise, can_check, rng)
     }
+}
+
+pub fn hand_strength(
+    observable_game_state: &simulator::game::ObservableState,
+    n_bins: usize,
+    n_samples: usize,
+) -> usize {
+    let my_player_hand = &observable_game_state.current_player.hand;
+    let board = &observable_game_state.board;
+    let n_wins: usize = (0..n_samples)
+        .map(|_| PokerHand::random_hand_win(board, my_player_hand) as usize)
+        .sum();
+
+    let strength = (n_wins as f32) / ((n_samples + 1) as f32);
+    (n_bins as f32 * strength).floor() as usize
 }
 
 #[test]

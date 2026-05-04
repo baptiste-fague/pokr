@@ -1,6 +1,8 @@
-mod board;
+pub mod board;
 pub mod deck;
-mod hand;
+pub mod hand;
+
+use rand::seq::IndexedRandom;
 
 pub use board::*;
 pub use deck::*;
@@ -14,6 +16,11 @@ pub struct Card {
 
 impl Card {
     pub fn new(suit: Suit, value: Value) -> Self {
+        Card { suit, value }
+    }
+    pub fn random() -> Self {
+        let suit = Suit::random();
+        let value = Value::random();
         Card { suit, value }
     }
 }
@@ -53,6 +60,26 @@ impl Value {
             Value::Two => 2,
         }
     }
+
+    pub fn random() -> Self {
+        let mut rng = rand::rng();
+        let values = [
+            Value::Ace,
+            Value::King,
+            Value::Queen,
+            Value::Jack,
+            Value::Ten,
+            Value::Nine,
+            Value::Eight,
+            Value::Seven,
+            Value::Six,
+            Value::Five,
+            Value::Four,
+            Value::Three,
+            Value::Two,
+        ];
+        *values.choose(&mut rng).unwrap()
+    }
 }
 
 impl PartialEq for Card {
@@ -77,4 +104,12 @@ pub enum Suit {
     Diamonds,
     Clubs,
     Hearts,
+}
+
+impl Suit {
+    pub fn random() -> Self {
+        let mut rng = rand::rng();
+        let suits = [Suit::Hearts, Suit::Diamonds, Suit::Clubs, Suit::Spades];
+        *suits.choose(&mut rng).unwrap()
+    }
 }
