@@ -1,10 +1,10 @@
-mod board;
-mod deck;
-mod hand;
+pub mod board;
+pub mod deck;
+pub mod hand;
 
 use std::collections::btree_map::Values;
 
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 
 pub use board::*;
 pub use deck::*;
@@ -64,7 +64,7 @@ impl Value {
     }
 
     pub fn random() -> Self{
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let values = [Value::Ace, 
                                 Value::King,
                                 Value::Queen,
@@ -109,8 +109,8 @@ pub enum Suit {
 
 impl Suit{
     pub fn random() -> Self{
-        let mut rng = rand::thread_rng();
-        let suits = [Suit::Heart, Suit::Diamond, Suit::Club, Suit::Spade];
+        let mut rng = rand::rng();
+        let suits = [Suit::Hearts, Suit::Diamonds, Suit::Clubs, Suit::Spades];
         *suits.choose(&mut rng).unwrap()
     }
 }

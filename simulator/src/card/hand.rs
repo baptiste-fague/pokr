@@ -28,7 +28,7 @@ impl PokerHand {
         })
     }
 
-    pub fn random_hand_win( board: &Board, agent_hand: &PlayerHand) -> bool {
+    pub fn random_hand_win(board: &Board, agent_hand: &PlayerHand) -> bool {
         let mut seen = board.cards().cloned().chain(agent_hand.cards().cloned()).collect_vec();
 
         let mut rejective_filter = |c: &Card| {
@@ -52,8 +52,8 @@ impl PokerHand {
 
         let opponent_hand: PlayerHand = PlayerHand {cards: opponent_cards};
 
-        let best_agent_hand = completed_board.best_poker_hand(agent_hand.cloned().collect());
-        let best_opponent_hand = completed_board.best_poker_hand(opponent_hand.cloned().collect());
+        let best_agent_hand = completed_board.best_poker_hand(&agent_hand).unwrap();
+        let best_opponent_hand = completed_board.best_poker_hand(&opponent_hand).unwrap();
 
         best_agent_hand >= best_opponent_hand
 
@@ -233,6 +233,57 @@ impl PokerHand {
             HandType::HighCard => true,
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn random_card_gen(){
+        let rand_card = Card::random();
+        println!("{:#?}", rand_card);
+    }
+
+    #[test]
+    fn compare_complete_board(){
+        let _my_hand = PlayerHand {
+            cards: [
+                Card::new(Suit::Hearts, Value::Ace),
+                Card::new(Suit::Hearts, Value::King),
+            ],
+        };
+
+        let _board:Board = Board::from_cards(vec![
+            Card::new(Suit::Hearts, Value::Queen),
+            Card::new(Suit::Hearts, Value::Jack),
+            Card::new(Suit::Hearts , Value::Ten),
+            Card::new(Suit::Clubs, Value::Two),
+            Card::new(Suit::Diamonds , Value::Two)
+        ]);
+        let _result:bool = PokerHand::random_hand_win(&_board, &_my_hand);
+        assert!(_result==true)
+    }
+    
+    #[test]
+    fn compare_partial_board(){
+        let _my_hand = PlayerHand {
+            cards: [
+                Card::new(Suit::Hearts, Value::Ace),
+                Card::new(Suit::Hearts, Value::King),
+            ],
+        };
+
+        let _board:Board = Board::from_cards(vec![
+            Card::new(Suit::Hearts, Value::Queen),
+            Card::new(Suit::Hearts, Value::Jack),
+            Card::new(Suit::Hearts , Value::Ten)
+        ]);
+        
+        let _result:bool = PokerHand::random_hand_win(&_board, &_my_hand);
+        assert!(_result==true)
+    }
+        
 }
 
 #[test]

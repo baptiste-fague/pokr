@@ -1,6 +1,11 @@
 use itertools::Itertools;
 use rand::{Rng, RngExt};
 
+use {simulator::game::ObservableState,
+    simulator::card::hand::PokerHand,
+    simulator::card::hand::PlayerHand,
+    simulator::card::board::Board};
+
 const VALUES_PER_CARD_SEQUENCE: usize = 3_usize.pow(4_u32);
 const N_BINS: usize = 10;
 const PRE_FLOP_BIN_COUNT: usize = N_BINS;
@@ -72,4 +77,16 @@ impl Agent {
     ) -> simulator::action::Action {
         todo!()
     }
+    pub fn hand_strength(observable_game_state: &simulator::game::ObservableState, n_bins : usize, n_samples: usize) -> usize {
+        let my_player_hand:PlayerHand = observable_game_state.current_player.hand;
+        let board:Board = observable_game_state.board;
+        let n_wins: usize = 0;
+        for i in 0..n_samples{
+            n_wins += PokerHand::random_hand_win(&board, &my_player_hand) as usize;
+        }
+        let strength:f32 = (n_wins as f32)/(n_samples as f32);
+        let bin = (n_bins as f32 * strength).floor() as usize;
+        return bin
+    }
+
 }
